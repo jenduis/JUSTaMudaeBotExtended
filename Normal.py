@@ -105,12 +105,14 @@ class MyClient(discord.Client):
                                 .*$                                         # End of string
                                 """, message.content, re.DOTALL | re.VERBOSE)
         if not match or match.group(1) != self.user.name:
+            print(f'{self.user.name} is {match.group(1)}')
             print(f'Failed to parse message:\n {message.content}')
             return
 
         times = [self.parse_time(match.group(i)) for i in [3, 4, 5, 7]]
         kakera_available = match.group(6) == 'can'
-        claim_available = match.group(2) == 'can'
+        claim_available = match.group(2) == 'can'  
+         
 
         timing_info = {
             'claim_reset': datetime.datetime.now() + datetime.timedelta(minutes=times[0]),
@@ -119,6 +121,8 @@ class MyClient(discord.Client):
             'kakera_available': kakera_available,
             'kakera_reset': datetime.datetime.now() + datetime.timedelta(minutes=times[3]),
             'daily_reset': datetime.datetime.now() + datetime.timedelta(minutes=times[2]),
+            
+              
         }
 
         sub_channels = Config.Channels[main_channel]
@@ -141,12 +145,12 @@ class MyClient(discord.Client):
                 timing_info["claim_reset"],
                 timing_info["rolls_reset"],
                 timing_info["daily_reset"],
-                timing_info['claim_available'],
+                timing_info["claim_available"],
                 timing_info["kakera_reset"],
                 timing_info["kakera_available"],
                 self.get_channel(channel_id),
                 channel_id,
-                self
+                self,
             )
 
             if channel_id == main_channel:
@@ -234,26 +238,26 @@ class MyClient(discord.Client):
                 else:
                     print(f"\nAttempting to snipe kakera for {waifu} ({child.emoji.name})\n")
                     await child.click()
-                
+
     async def attempt_claim(self, waifu, message, main_channel_id):
         if waifu.kakera is not None:
             if waifu.kakera > Config.lastminkak or waifu.kakera > Config.minkak or waifu.name in Config.Wishlist or f"{self.user.id}" in message.content:
                 if self.rolling[main_channel_id].get_claim_availability():
                     if self.rolling[main_channel_id].is_last_min_claim_active():
-                            if waifu.kakera >= Config.lastminkak or waifu.kakera >= Config.minkak or waifu.name in Config.Wishlist or f"{self.user.id}" in message.content:
-                                await self.claim_waifu(message, waifu)
+                        if waifu.kakera >= Config.lastminkak or waifu.kakera >= Config.minkak or waifu.name in Config.Wishlist or f"{self.user.id}" in message.content:
+                            await self.claim_waifu(message, waifu, main_channel_id)
                     elif waifu.kakera >= Config.minkak or waifu.name in Config.Wishlist or f"{self.user.id}" in message.content:
-                        await self.claim_waifu(message, waifu)
+                        await self.claim_waifu(message, waifu, main_channel_id)
                 else:
                     print(f"No Claim Available for - {message.channel.name} - to claim {waifu}")
         elif waifu.kakera is None:
             if waifu.name in Config.Wishlist or f"{self.user.id}" in message.content:
                 if self.rolling[main_channel_id].get_claim_availability():
-                    await self.claim_waifu(message, waifu)
+                    await self.claim_waifu(message, waifu, main_channel_id)
                 else:
                     print(f"No Claim Available for - {message.channel.name} - to claim {waifu}")
 
-    async def claim_waifu(self, message, waifu):
+    async def claim_waifu(self, message, waifu, main_channel_id):
         print(f"\nTrying to claim {waifu}\n")
         if message.components:
             print("Possibly a wish")
@@ -262,6 +266,7 @@ class MyClient(discord.Client):
             else:
                 for child in message.components[0].children:
                     await child.click()
+                    await self.process_buttonclick(message, main_channel_id)
         else:
             await message.add_reaction('❤️')
 
@@ -286,6 +291,28 @@ class MyClient(discord.Client):
                 return
 
             await self.process_reaction(reaction, message, main_channel_id)
+
+    async def process_buttonclick(self, message, main_channel_id):
+        mudae_wrap = Mudae(self, None)
+        waifu = mudae_wrap.waifu_from(message)
+        await asyncio.sleep(2)
+        async for next_message in message.channel.history(limit=20, after=message):
+            if next_message.author.id == bot_id and self.user.name in next_message.content and waifu.name in next_message.content:
+                if Config.Message is not None:
+                    await message.channel.send(Config.Message)
+                else:
+                    pass
+                print(f"{waifu.name} Claimed")
+                self.rolling[main_channel_id].set_claim_availability(False)
+                if not Config.AlwaysRoll:
+                    self.rolling[main_channel_id].rolling_event.set()
+                break
+            elif f"{self.user.id}" in next_message.content and next_message.author.id == bot_id:
+                self.rolling[main_channel_id].set_claim_availability(False)
+                print("Claim already used")
+                if not Config.AlwaysRoll:
+                    self.rolling[main_channel_id].rolling_event.set()
+                break
 
     async def process_reaction(self, reaction, message, main_channel_id):
         mudae_wrap = Mudae(self, None)
