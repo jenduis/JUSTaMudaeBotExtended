@@ -2,6 +2,13 @@
 
 This is a bot that utilizes some aspects of discord.py-self and discum to create a discord self bot that can claim wishes and characters above a min kakera, last minute claim and react to kakera. 
 
+## Fork Features
+
+- Ability to turn on and off Auto rolling.
+- Ability to turn on and off Auto $dk usage.
+- New Timers for non snipe self delay for reactions.
+- Set to always trying to claim wishes even if snipe is off. (Might add a toggle in the future.) 
+
 ## Features
 - Can claim characters above a certain kakera 
 - Can last minute claim during the last 60 minutes of claim timer
